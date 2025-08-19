@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Search Google Maps Back (Aggiornato)
 // @namespace    http://tampermonkey.net/
-// @version      2025.07.30.2
+// @version      2025.07.30.3
 // @description  Riporta il pulsante "Maps" nella ricerca Google e rende cliccabili le mappe nei risultati
 // @author       Patch by ChatGPT
 // @match        https://www.google.com/search*
@@ -12,6 +12,7 @@
     'use strict';
 
     let addedButton = false;
+    let patchedMiniMap = false;
 
     function addBigMapButton() {
         if (addedButton) return;
@@ -47,13 +48,12 @@
         const searchQuery = new URLSearchParams(window.location.search).get('q');
         const mapsLink = `https://www.google.com/maps?q=${searchQuery}`;
 
-        const tabListContainer = document.querySelector('.HTOhZ .beZ0tf.O1uzAe');
+        const tabListContainer = document.querySelector('.GG4mbd .beZ0tf');
         if (!tabListContainer) return;
 
         const alreadyPresent = Array.from(tabListContainer.querySelectorAll('a')).some(a => a.href.includes('google.com/maps'));
         if (alreadyPresent) return;
 
-        // crea il listitem wrapper
         const listItem = document.createElement('div');
         listItem.setAttribute('role', 'listitem');
 
@@ -72,7 +72,6 @@
         mapsTab.appendChild(div);
         listItem.appendChild(mapsTab);
 
-        // Inserisci dopo "Tutti"
         const firstItem = tabListContainer.querySelector('div[role="listitem"]');
         if (firstItem) {
             tabListContainer.insertBefore(listItem, firstItem.nextSibling);
@@ -84,9 +83,42 @@
         addedButton = true;
     }
 
+    function patchMiniMap() {
+        if (patchedMiniMap) return;
+
+        const mapContainer = document.querySelector('div[jsname="AJpLtd"], div.yXg2De');
+        if (!mapContainer) return;
+
+        const searchQuery = new URLSearchParams(window.location.search).get('q');
+        const mapsLink = `https://www.google.com/maps?q=${searchQuery}`;
+
+        // Già patchata?
+        if (mapContainer.querySelector('a[data-gmaps-patched]')) return;
+
+        const overlay = document.createElement('a');
+        overlay.href = mapsLink;
+        overlay.target = '_blank';
+        overlay.rel = 'noopener';
+        overlay.setAttribute('data-gmaps-patched', '1');
+
+        overlay.style.position = 'absolute';
+        overlay.style.top = '0';
+        overlay.style.left = '0';
+        overlay.style.width = '100%';
+        overlay.style.height = '100%';
+        overlay.style.zIndex = '10';
+
+        mapContainer.style.position = 'relative';
+        mapContainer.appendChild(overlay);
+
+        patchedMiniMap = true;
+        console.log('✅ Mini map overlay link applied');
+    }
+
     const observer = new MutationObserver(() => {
         addMapsButton();
         addBigMapButton();
+        patchMiniMap();
     });
 
     observer.observe(document.body, { childList: true, subtree: true });
